@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DependencyLoaderMod</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+    <Version>0.1.0</Version>
+    <OutputPath>..\..\server-csharp-main\SPTarkov.Server\bin\$(Configuration)\net10.0\user\mods\DependencyLoaderMod\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Copy NuGet dependency DLLs to output for runtime loading -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- SPTarkov 服务端源码编译产物作为依赖（不随模组部署） -->
+    <Reference Include="SPTarkov.Common">
+      <HintPath>..\..\server-csharp-main\Libraries\SPTarkov.Common\bin\$(Configuration)\net10.0\SPTarkov.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SPTarkov.DI">
+      <HintPath>..\..\server-csharp-main\Libraries\SPTarkov.DI\bin\$(Configuration)\net10.0\SPTarkov.DI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SPTarkov.Reflection">
+      <HintPath>..\..\server-csharp-main\Libraries\SPTarkov.Reflection\bin\$(Configuration)\net10.0\SPTarkov.Reflection.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SPTarkov.Server.Core">
+      <HintPath>..\..\server-csharp-main\Libraries\SPTarkov.Server.Core\bin\$(Configuration)\net10.0\SPTarkov.Server.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- 传递依赖（版本与 4.1 服务端一致） -->
+    <PackageReference Include="SemanticVersioning" Version="3.0.0" />
+    <!-- NuGet.Protocol for proper v3 index.json-based package download -->
+    <PackageReference Include="NuGet.Protocol" Version="6.12.1" />
+    <PackageReference Include="NuGet.Packaging" Version="6.12.1" />
+  </ItemGroup>
+
+  <!-- Post-build: Move dependency DLLs to ./dependencies/ so SPT doesn't pick up duplicate mod metadata.
+       NuGet.*.dll must stay in root because the CLR needs them at assembly load time (before static constructors run).
+       SPT's DI scanner calls assembly.GetTypes() which triggers resolution of all referenced types. -->
+  <Target Name="MoveDependencies" AfterTargets="Build">
+    <ItemGroup>
+      <!-- Keep mod's own assembly and all NuGet.*.dll in root; move everything else to dependencies/ -->
+      <DepFiles Include="$(OutputPath)*.dll" Exclude="$(OutputPath)$(AssemblyName).dll;$(OutputPath)NuGet.*.dll" />
+      <!-- Also move .pdb, .xml, .json (except config.json) -->
+      <DepFiles Include="$(OutputPath)*.pdb" Exclude="$(OutputPath)$(AssemblyName).pdb" />
+      <DepFiles Include="$(OutputPath)*.xml" />
+      <!-- Keep deps.json and staticwebassets.endpoints.json in root for NuGet auto-resolve, also copy to dependencies/ -->
+      <DepFiles Include="$(OutputPath)*.staticwebassets.endpoints.json" />
+    </ItemGroup>
+    <ItemGroup>
+      <!-- Copy deps.json to dependencies/ as well -->
+      <DepsJsonFiles Include="$(OutputPath)*.deps.json" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutputPath)dependencies" />
+    <Move SourceFiles="@(DepFiles)" DestinationFolder="$(OutputPath)dependencies" Condition="Exists('%(FullPath)')" />
+    <!-- Copy deps.json to dependencies/ (originals stay in root for NuGet auto-resolve) -->
+    <Copy SourceFiles="@(DepsJsonFiles)" DestinationFolder="$(OutputPath)dependencies\" Condition="Exists('%(FullPath)')" />
+  </Target>
+</Project>
