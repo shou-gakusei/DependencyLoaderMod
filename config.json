@@ -1,0 +1,5 @@
+{
+    "enableNugetFallback": true,
+    "nugetSource": "",
+    "enableProgressBar": true
+}
